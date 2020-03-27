@@ -1,95 +1,75 @@
-%%%%%典型模拟面波多道数据处理程序%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 close all; clear all; 
-clc;
-% Add some utility directories to the path
-tic
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fidin = fopen('E:\MCAtiaoshichengxu\HarmNoisRemv_去谐波_最终程序\HarmNoisRemv\实验结果\shot5660_pc_31871_33189.sgy','r');
-% 
-% volume_head = fread(fidin,[3600,1],'*uchar');%%%%%读3600字节卷头
+clc; 
+import MCALabWithUtilities.Utils.HardThresh.*
+%% Initialization of parameter, length of shot M, length of time series N, dt sampling rate, shot distance dx, length of shot used to process
+dt  = 0.002; N   = 1001; nt=N;  nx=60;  dx=0.005; M=120;       
+t=(0:N-1).*dt; t=t'; 
 
-dt  = 0.002; %采样时间间隔，由输入文件决定
-N   = 1001;  %每道数据的长度，由输入文件决定
-nt=N;
-nx=60;  %实际截取道数
-dx=0.005;
-M=120;       %文件的总道数，由输入文件决定
-t=(0:N-1).*dt;
-t=t'; 
-n=nt*nx;
-nsg=zeros(nt,nx);
-qumianbo=zeros(nt,nx);
-qumianbonew=zeros(nt,nx);
-mianbo=zeros(nt,nx);
-mianbonew=zeros(nt,nx);
-yuanshishuju=zeros(nt,nx);
-% for i=1:M
-%     trace_head = fread(fidin, [240,1], '*uchar');%%%%%读240字节道头
-% %    
-%      nsg(:,i)=fread(fidin,[N,1],'float');
-%  end
-% fclose(fidin);
-% 
-% fnq  = 1/dt/2;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rawdata=zeros(nt,nx);
+bw=zeros(nt,nx);
+dec_bw=zeros(nt,nx); % decomposed body wave
+gr=zeros(nt,nx);
+dec_gr=zeros(nt,nx);  % decomposed ground roll
+rawdata=zeros(nt,nx);
+
 % The value of Q is small
 pmax1=5;
 p1=0:pmax1/100:pmax1;
 x1=0*dx:dx:59*dx;
 dictWave1 = struct('p1', p1,'x1',x1);
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % The value of Q is large
 pmax2=20;
 p2=0:pmax2/100:pmax2;
 x2=0*dx:dx:59*dx;
 dictWave2 = struct('p2', p2,'x2',x2);
+
 % Bodywave/groundroll separation
-% Call the BCR to sovle the optimization problem   
-CQ1 =0.3;%Q1值的小波变换阈值权重
-CQ2 =3;  %Q2值的小波变换阈值权重
+CQ1 =0.3;
+CQ2 =3; 
 Cweight     = struct('CQ1', CQ1, 'CQ2', CQ2);
- thdtype     = 'hard';%阈值类型
+thdtype     = 'Hard'; % iterativ hard threshold 
 itermax 	= 30;
-expdecrease	= 1;      %阈值按照线性减小
+expdecrease	= 1;      %threshold decreases linearly
 lambdastop=5e-1;
 sigma      = 5e-5;
-display		= 0;
+display		= 1;
 
-fid = fopen('E:\时空域Radon变换字典MCA应用程序\MCAsuppressgroundroll\HarmNoisRemv_去谐波_最终程序\HarmNoisRemv\实验原数据\newgroundmodel.dat','r');%输入文件
-[ddp,count]=fread(fid,[1001,120],'float');
-% fidout1 = fopen('E:\MCA实际数据分离结果\典型模拟数据newgroundmodel的分离结果\去面波后1.sgy','w');%输出文件
-% fidout2 = fopen('E:\MCA实际数据分离结果\典型模拟数据newgroundmodel的分离结果\去掉面波1.sgy','w');%输出文件
-% fidout3 = fopen('E:\MCA实际数据分离结果\典型模拟数据newgroundmodel的分离结果\原信号1.sgy','w');%输出文件
-%  noprocessing=zeros(1,M);
-     
-nsg=ddp(:,61:120);
-   parts = MCA_Bcr_Radon(nsg,dictWave1,dictWave2,Cweight,thdtype,itermax,expdecrease,lambdastop,sigma,display,dt);
-   nsg1=reshape(nsg,n,1);
-   parts(:,1)=nsg1-parts(:,2);
-   mianbo=reshape(parts(:,2),nt,nx);
-   for i=1:nx
-       fre1=200/(1/dt/2);
-       [B,A]=butter(8,fre1,'low');
-       mianbonew(1:N,i)=filtfilt(B,A,mianbo(1:N,i));
-   end
-   qumianbo=reshape(parts(:,1),nt,nx);
-   for i=1:nx
-       fre1=30/(1/dt/2);
-       [B,A]=butter(8,fre1,'low');
-       qumianbonew(1:N,i)=filtfilt(B,A,qumianbo(1:N,i));
-   end
-   yuanshishuju=nsg;
+fid = fopen('data\newgroundmodel.dat','r');
+[ddp,~]=fread(fid,[1001,120],'float');
+    
+%% Call the BCR to sovle the optimization problem   
+rawdata=ddp(:,61:120);
+parts = MCA_Bcr_Radon(rawdata,dictWave1,dictWave2,Cweight,thdtype,itermax,expdecrease,lambdastop,sigma,display,dt);
+  
+
+parts(:,1)= reshape(rawdata,nt*nx,1)-parts(:,2);
+gr=reshape(parts(:,2),nt,nx);
+bw=reshape(parts(:,1),nt,nx);
+
+for i=1:nx
+   fre1=200/(1/dt/2);
+   [B,A]=butter(8,fre1,'low');
+   dec_gr(1:N,i)=filtfilt(B,A,gr(1:N,i));
+end
+
+for i=1:nx
+   fre1=30/(1/dt/2);
+   [B,A]=butter(8,fre1,'low');
+   dec_bw(1:N,i)=filtfilt(B,A,bw(1:N,i)); % dec_dw
+end
 
 fclose(fid);
+
+
+%% plot
 xx=1:60;
 yy=(1:1001)*dt;
-figure;pcolor(xx,yy,mianbo);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
-figure;pcolor(xx,yy,qumianbo);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
-figure;pcolor(yuanshishuju);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');
-figure;pcolor(xx,yy,mianbonew);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
-figure;pcolor(xx,yy,qumianbonew);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
-toc
-figure;plot(yy,yuanshishuju(:,5));
-figure;plot(yy,mianbonew(:,5));
-figure;plot(yy,qumianbonew(:,5));
+figure;pcolor(xx,yy,gr);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
+figure;pcolor(xx,yy,bw);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
+figure;pcolor(rawdata);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');
+figure;pcolor(xx,yy,dec_gr);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
+figure;pcolor(xx,yy,dec_bw);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
+figure;plot(yy,rawdata(:,5));
+figure;plot(yy,dec_gr(:,5));
+figure;plot(yy,dec_bw(:,5));

@@ -31,11 +31,10 @@ function parts=MCA_Bcr_Radon(signal,wave1,wave2,Cweight,thdtype,itermax,expdecre
 
 % initializations. Put the signal as a column vector.
 numberofdicts = 2;              % no. of signal components
-sigpad=signal;
-[nt,nx]=size(sigpad);
+[nt,nx]=size(signal);
 n=nt*nx;
 part	      = zeros(n,numberofdicts);
-CQ1           = Cweight.CQ1;    % l2 norm normalization constants
+CQ1           = Cweight.CQ1;     % l2 norm normalization constants
 CQ2           = Cweight.CQ2;    
 
 % dictionaries - wavelet transform
@@ -46,27 +45,28 @@ x1=wave1.x1;
 p2=wave2.p2;
 x2=wave2.x2;
 
-np=length(p1);
+
 stopcriterion = stop*sigma;
+%% plot hyperplan radon transformation
+w1coef=cgnr_radon_hyper(signal,dt,x1,p1);
 t=(0:nt-1).*dt;
-w1coef=cgnr_radon_hyper(sigpad,dt,x1,p1);
 figure
 pcolor(p1,t,w1coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
 set(gcf, 'Renderer', 'ZBuffer');
 xlabel('扫描斜率');ylabel('时间/s');
-w2coef=cgnr_radon_linear(sigpad,dt,x2,p2);
+
+% plot linear radon transform
+w2coef=cgnr_radon_linear(signal,dt,x2,p2);
 figure
 pcolor(p2,t,w2coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
 set(gcf, 'Renderer', 'ZBuffer');
 xlabel('扫描斜率');ylabel('时间/s');
-for i=1:(np)
-     c(i)=max(abs(w1coef(:,i)));        
- end
-maxW1=max(c)
-for i=1:(np)
-     d(i)=max(abs(w2coef(:,i)));            
- end
-maxW2=max(d)
+
+
+%% Iterative Threshold
+np=length(p1);
+maxW1= max(abs(w1coef), [], 'all')
+maxW2= max(abs(w2coef), [], 'all')
 deltamax = min([maxW1 maxW2])
 
 
@@ -85,41 +85,55 @@ if display
    nbpr=ceil(sqrt(numberofdicts+2));
 end
 
-part = zeros(n,2); 
+part = zeros(n,numberofdicts); 
+
+
+
 % start the modified Block Relaxation Algorithm.
 for iter=0:itermax-1
     tic;
     iter
-   % calculate the residual signal.
-   summ=reshape(sum(part,2),nt,nx);
-   residual1=sigpad-summ;
-        
-   % cycle over dictionaries
-   % Update Parta assuming other parts fixed.
-   % Solve for Parta the marginal penalized minimization problem (Hard thesholding, l_1 -> Soft).
-  residual=reshape(residual1,n,1) ;
-   Ra1    = part(:,1)+residual;
-   Ra=reshape(Ra1,nt,nx); 
-   w1coef=cgnr_radon_hyper(Ra,dt,x1,p1);
-   w1=w1coef;
+    % calculate the residual signal.
+    summ=reshape(sum(part,2),nt,nx);
+    init_residual=signal-summ;
+
+    % cycle over dictionaries
+    % Update Parta assuming other parts fixed.
+    % Solve for Parta the marginal penalized minimization problem (Hard thesholding, l_1 -> Soft).
+    residual=reshape(init_residual,n,1) ;
+    Ra1    = part(:,1)+residual;
+    Ra2    = part(:,2)+residual;
+    Ra=reshape(Ra1,nt,nx); 
+
+    
+    w1coef=cgnr_radon_hyper(Ra,dt,x1,p1);
     for i=1:(np)
-   w1coef(:,i) = eval([thdtype 'Thresh(w1coef(:,i),CQ1*delta)']); 
+        w1coef(:,i) = eval([thdtype 'Thresh(w1coef(:,i),CQ1*delta)']); 
     end    
-   a= invfwd_tx_sstackn_hyper(w1coef,dt,p1,x1);
-   part(:,1)=reshape(a,n,1);
-   Ra2    = part(:,2)+residual;
-   Ra=reshape(Ra2,nt,nx); 
-   w2coef=cgnr_radon_linear(Ra,dt,x2,p2);
-   w2=w2coef;
+    
+    w1coef = HardThresh(wcoef, CQ1*delta);
+    
+    a= invfwd_tx_sstackn_hyper(w1coef,dt,p1,x1);
+    part(:,1)=reshape(a,n,1);
+    Ra=reshape(Ra2,nt,nx); 
+    w2coef=cgnr_radon_linear(Ra,dt,x2,p2);
+
+    
     for i=1:(np)
-   w2coef(:,i) = eval([thdtype 'Thresh(w2coef(:,i),CQ2*delta)']); 
+        w2coef(:,i) = eval([thdtype 'Thresh(w2coef(:,i),CQ2*delta)']); 
     end
     b=invfwd_tx_sstackn_linear(w2coef,dt,p2,x2);
     part(:,2)=reshape(b,n,1);
-   % Update the regularization parameter delta.
-   if expdecrease	delta=delta*lambda; % Exponential decrease.	
-   else		delta=delta-lambda; % Linear decrease.
-   end
+    
+    
+    % Update the regularization parameter delta.
+    if expdecrease
+        delta=delta*lambda; % Exponential decrease.	
+    else
+        delta=delta-lambda; % Linear decrease.
+    end
+    
+    
 	% Displays the progress.
 	if display,
 	   waitbar((iter+1)/itermax,h);	    
@@ -140,3 +154,19 @@ end
 
 % Crop data to original size.
 parts = part(1:n,:);
+
+function x = HardThresh(y,t)
+% HardThresh -- Apply Hard Threshold 
+%  Usage 
+%    x = HardThresh(y,t)
+%  Inputs 
+%    y     Noisy Data 
+%    t     Threshold
+%  Outputs 
+%    x     y 1_{|y|>t}
+%
+	x   = y .* (abs(y) > t);
+
+%
+% Copyright (c) 1993-5.  Jonathan Buckheit, David Donoho and Iain Johnstone
+%
