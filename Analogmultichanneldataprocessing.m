@@ -1,15 +1,15 @@
 close all; clear all; 
 clc; 
-import MCALabWithUtilities.Utils.HardThresh.*
+
 %% Initialization of parameter, length of shot M, length of time series N, dt sampling rate, shot distance dx, length of shot used to process
 dt  = 0.002; N   = 1001; nt=N;  nx=60;  dx=0.005; M=120;       
 t=(0:N-1).*dt; t=t'; 
 
 rawdata=zeros(nt,nx);
 bw=zeros(nt,nx);
-dec_bw=zeros(nt,nx); % decomposed body wave
+filt_bw=zeros(nt,nx); % decomposed body wave
 gr=zeros(nt,nx);
-dec_gr=zeros(nt,nx);  % decomposed ground roll
+filt_gr=zeros(nt,nx);  % decomposed ground roll
 rawdata=zeros(nt,nx);
 
 % The value of Q is small
@@ -28,7 +28,7 @@ dictWave2 = struct('p2', p2,'x2',x2);
 CQ1 =0.3;
 CQ2 =3; 
 Cweight     = struct('CQ1', CQ1, 'CQ2', CQ2);
-thdtype     = 'Hard'; % iterativ hard threshold 
+thdtype     = 'Soft'; % iterativ hard threshold 
 itermax 	= 30;
 expdecrease	= 1;      %threshold decreases linearly
 lambdastop=5e-1;
@@ -50,26 +50,24 @@ bw=reshape(parts(:,1),nt,nx);
 for i=1:nx
    fre1=200/(1/dt/2);
    [B,A]=butter(8,fre1,'low');
-   dec_gr(1:N,i)=filtfilt(B,A,gr(1:N,i));
+   filt_gr(1:N,i)=filtfilt(B,A,gr(1:N,i));
 end
 
 for i=1:nx
    fre1=30/(1/dt/2);
    [B,A]=butter(8,fre1,'low');
-   dec_bw(1:N,i)=filtfilt(B,A,bw(1:N,i)); % dec_dw
+   filt_bw(1:N,i)=filtfilt(B,A,bw(1:N,i)); % dec_dw
 end
 
 fclose(fid);
-
-
 %% plot
 xx=1:60;
 yy=(1:1001)*dt;
 figure;pcolor(xx,yy,gr);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
 figure;pcolor(xx,yy,bw);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
 figure;pcolor(rawdata);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');
-figure;pcolor(xx,yy,dec_gr);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
-figure;pcolor(xx,yy,dec_bw);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
+figure;pcolor(xx,yy,filt_gr);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(a)');
+figure;pcolor(xx,yy,filt_bw);colormap('gray');shading interp; set(gca,'XAxisLocation','top');axis ij;xlabel('Trace No.');ylabel('Time(s)');title('(b)');
 figure;plot(yy,rawdata(:,5));
-figure;plot(yy,dec_gr(:,5));
-figure;plot(yy,dec_bw(:,5));
+figure;plot(yy,filt_gr(:,5));
+figure;plot(yy,filt_bw(:,5));
