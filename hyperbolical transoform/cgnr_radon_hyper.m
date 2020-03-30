@@ -1,15 +1,10 @@
-function m=cgnr_radon_hyper(d,dt,x,p)
-%时空域高分辨率Radon变换
-%输入参数：
-%d:二维数据  dt:采样间隔  x:偏移距  p:扫描斜率或者曲率
-%输出参数：
-%m:Radon域结果
+function m=cgnr_radon_hyper(d,s)
+
 [nt,nx]=size(d);
-np=length(p);
+np=length(s.p);
 M=ones(nt*np,1);  %初始的加权矩阵
-size(M)
 d1=reshape(d,nt*nx,1);               %将二维数据拉成一维
-L=radon_transform1();                %重载乘法，重载算子L
+L=radon_transform1(s);                %重载乘法，重载算子L
 %采用CGLS算法求解大型的矩阵方程
 for j=1:5                           %外部迭代次数
 m0=zeros(size(M));
