@@ -1,27 +1,32 @@
 close all; clear all; 
-clc; 
+clc; clear classes
+addpath  C:\Users\strohwitwer\Documents\Mein Folder\Ground-roll-removal-through-MCA\radon_transform
 
 %% Initialization of parameter, length of shot M, length of time series N, dt sampling rate, shot distance dx, length of shot used to process
-dt  = 0.002; N   = 1001; nt=N;  nx=60;  dx=0.005; M=120;       
-t=(0:N-1).*dt; t=t'; 
+dt  = 0.002; N = 1001; nt=N;  nx=60;  dx=0.005;        
+t=(0:nt-1).*dt; t=t'; 
 
-rawdata=zeros(nt,nx);
-bw=zeros(nt,nx);
-filt_bw=zeros(nt,nx); % decomposed body wave
-gr=zeros(nt,nx);
-filt_gr=zeros(nt,nx);  % decomposed ground roll
-rawdata=zeros(nt,nx);
 
+% bw=zeros(nt,nx);
+% filt_bw=zeros(nt,nx); % decomposed body wave
+% gr=zeros(nt,nx);
+% filt_gr=zeros(nt,nx);  % decomposed ground roll
+% 
+
+
+np = 100;
 % The value of Q is small
 pmax1=5;
-p1=0:pmax1/100:pmax1;
-x1=0*dx:dx:59*dx;
+p1=0:pmax1/np:pmax1;
+x1=0*dx:dx:(nx-1)*dx;
+np1 = length(p1);
 dictWave1 = struct('p1', p1,'x1',x1);
 
 % The value of Q is large
 pmax2=20;
-p2=0:pmax2/100:pmax2;
-x2=0*dx:dx:59*dx;
+p2=0:pmax2/np:pmax2;
+x2=0*dx:dx:(nx-1)*dx;
+np2 = length(p2);
 dictWave2 = struct('p2', p2,'x2',x2);
 
 % Bodywave/groundroll separation
@@ -39,8 +44,10 @@ fid = fopen('data\newgroundmodel.dat','r');
 [ddp,~]=fread(fid,[1001,120],'float');
     
 %% Call the BCR to sovle the optimization problem   
+Para_1 = struct('dt',dt,'nt',nt,'t',t,'dx',dx,'nx',nx,'x',x1,'p',p1,'np',np1,'pmax',pmax1);
+Para_2 = struct('dt',dt,'nt',nt,'t',t,'dx',dx,'nx',nx,'x',x2,'p',p2,'np',np2,'pmax',pmax2);
 rawdata=ddp(:,61:120);
-parts = MCA_Bcr_Radon(rawdata,dictWave1,dictWave2,Cweight,thdtype,itermax,expdecrease,lambdastop,sigma,display,dt);
+parts = MCA_Bcr_Radon(rawdata,dictWave1,dictWave2,Cweight,thdtype,itermax,expdecrease,lambdastop,sigma,display,Para_1,Para_2);
   
 
 parts(:,1)= reshape(rawdata,nt*nx,1)-parts(:,2);
