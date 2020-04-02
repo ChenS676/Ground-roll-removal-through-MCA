@@ -1,4 +1,4 @@
-function parts=MCA_Bcr_Radon(signal,wave1,wave2,Cweight,thdtype,itermax,expdecrease,stop,sigma,display,Para_1,Para_2)
+function parts=MCA_Bcr_Radon(signal,wave1,wave2,Cweight,thdtype,itermax,expdecrease,stop,sigma,display,dt)
 % MCA_Bcr: Morphological Component Analysis of a 1D signal (a vector) using highly redundant dictionaries.
 %	   The optimization bp is solved using a modified version of the BCR algorithm.
 %	   MCA_bcr solves the following optimization problem
@@ -28,7 +28,7 @@ function parts=MCA_Bcr_Radon(signal,wave1,wave2,Cweight,thdtype,itermax,expdecre
 %  See Also
 %    FastLA, FastLS, MCADemo
 
-addpath 'C:\Users\strohwitwer\Documents\Mein Folder\Ground-roll-removal-through-MCA\radon_transform'
+
 % initializations. Put the signal as a column vector.
 numberofdicts = 2;              % no. of signal components
 [nt,nx]=size(signal);
@@ -48,17 +48,17 @@ x2=wave2.x2;
 
 stopcriterion = stop*sigma;
 %% plot hyperplan radon transformation
-w1coef=cgnr_radon(signal,Para_1,'hyper');
-
+w1coef=cgnr_radon_hyper(signal,dt,x1,p1);
+t=(0:nt-1).*dt;
 figure
-pcolor(p1,Para_1.t,w1coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
+pcolor(p1,t,w1coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
 set(gcf, 'Renderer', 'ZBuffer');
 xlabel('扫描斜率');ylabel('时间/s');
 
 % plot linear radon transform
-w2coef=cgnr_radon(signal,Para_2,'linear');
+w2coef=cgnr_radon_linear(signal,dt,x2,p2);
 figure
-pcolor(p2,Para_2.t,w2coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
+pcolor(p2,t,w2coef),shading interp;set(gca,'XAxisLocation','top');axis ij;
 set(gcf, 'Renderer', 'ZBuffer');
 xlabel('扫描斜率');ylabel('时间/s');
 
@@ -107,22 +107,22 @@ for iter=0:itermax-1
     % cycle over dictionaries
     % Update Parta assuming other parts fixed.
     % Solve for Parta the marginal penalized minimization problem (Hard thesholding, l_1 -> Soft).
-    residual=reshape(init_residual,n,1);
+    residual=reshape(init_residual,n,1) ;
     Ra1    = part(:,1)+residual;
     Ra2    = part(:,2)+residual;
     Ra=reshape(Ra1,nt,nx); 
 
     
-    w1coef=cgnr_radon(Ra,Para_1,'hyper');   
+    w1coef=cgnr_radon_hyper(Ra,dt,x1,p1);   
     w1coef = HardThresh(w1coef, CQ1*delta);
-    a= invfwd_tx_sstackn(w1coef,dt,p1,x1,'type');
+    a= invfwd_tx_sstackn_hyper(w1coef,dt,p1,x1);
     part(:,1)=reshape(a,n,1);
     
     
     Ra=reshape(Ra2,nt,nx); 
-    w2coef=cgnr_radon(Ra,Para_2,'linear');
+    w2coef=cgnr_radon_linear(Ra,dt,x2,p2);
     w2coef = HardThresh(w2coef, CQ1*delta);
-    b=invfwd_tx_sstackn_linear(w2coef,dt,p2,x2,'linear');
+    b=invfwd_tx_sstackn_linear(w2coef,dt,p2,x2);
     part(:,2)=reshape(b,n,1);
     
     

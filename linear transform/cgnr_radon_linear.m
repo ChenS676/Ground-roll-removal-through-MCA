@@ -1,4 +1,4 @@
-function m=cgnr_radon_hyper(d,dt,x,p)
+function m=cgnr_radon_linear(d,dt,x,p)
 %时空域高分辨率Radon变换
 %输入参数：
 %d:二维数据  dt:采样间隔  x:偏移距  p:扫描斜率或者曲率
@@ -9,7 +9,7 @@ np=length(p);
 M=ones(nt*np,1);  %初始的加权矩阵
 size(M)
 d1=reshape(d,nt*nx,1);               %将二维数据拉成一维
-L=radon_transform1();                %重载乘法，重载算子L
+L=radon_transform2();                %重载乘法，重载算子L
 %采用CGLS算法求解大型的矩阵方程
 for j=1:5                           %外部迭代次数
 m0=zeros(size(M));
@@ -20,7 +20,7 @@ p0=r0;
 pn=M.*p0;
 q0=L*pn;
 k=1;
-while k<=50                     %内部迭代次数
+while k<=50                          %内部迭代次数
     a0=norm(r0)^2/norm(q0)^2;
     m1=m0+a0*p0;
     s1=s0-a0*q0;
